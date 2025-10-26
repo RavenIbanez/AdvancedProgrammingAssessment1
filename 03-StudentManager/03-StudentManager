@@ -1,0 +1,132 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# Load student data from a file
+def load_student_data(filename="03-StudentManager\studentMarks.txt"):
+    students = []
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            total = int(f.readline().strip())  # first line = number of students
+            for line in f:
+                parts = line.strip().split(",")
+                if len(parts) == 6:  # check for correct number of fields
+                    code = int(parts[0])
+                    name = parts[1]
+                    c1, c2, c3, exam = map(int, parts[2:])
+                    cw_total = c1 + c2 + c3  # sum of coursework marks
+                    overall = ((cw_total + exam) / 160) * 100  # total % score
+                    grade = get_grade(overall)
+                    # store everything neatly in a dictionary
+                    students.append({
+                        "code": code,
+                        "name": name,
+                        "cw_total": cw_total,
+                        "exam": exam,
+                        "overall": round(overall, 2),
+                        "grade": grade
+                    })
+            if len(students) != total:
+                print(f"Warning: expected {total} students, found {len(students)}")
+    except FileNotFoundError:
+        messagebox.showerror("Error", f"{filename} not found!")
+    return students
+
+# Simple function to get letter grade based on overall %
+def get_grade(p):
+    if p >= 70: return "A"
+    elif p >= 60: return "B"
+    elif p >= 50: return "C"
+    elif p >= 40: return "D"
+    else: return "F"
+
+# Show student data in the table
+def display_students(data=None):
+    for row in tree.get_children():
+        tree.delete(row)  # clear existing rows
+    if data is None:
+        data = students
+    for s in data:
+        tree.insert("", "end", values=(s["code"], s["name"], s["cw_total"], s["exam"], s["overall"], s["grade"]))
+    if data:
+        avg = round(sum(s["overall"] for s in data) / len(data), 2)
+        summary_text.set(f"Number of Students: {len(data)} | Class Average: {avg}%")
+    else:
+        summary_text.set("No student records found.")
+
+# Show student with highest overall
+def show_highest():
+    if not students: return
+    top = max(students, key=lambda s: s["overall"])
+    display_students([top])
+    summary_text.set(f"Top Student: {top['name']} ({top['overall']}%) - Grade {top['grade']}")
+
+# Show student with lowest overall
+def show_lowest():
+    if not students: return
+    low = min(students, key=lambda s: s["overall"])
+    display_students([low])
+    summary_text.set(f"Lowest Student: {low['name']} ({low['overall']}%) - Grade {low['grade']}")
+
+# Search for students by name or code
+def search_student():
+    query = search_entry.get().strip().lower()
+    results = [s for s in students if query in s["name"].lower() or query in str(s["code"])]
+    if results:
+        display_students(results)
+    else:
+        messagebox.showinfo("Not Found", "No matching student found.")
+        display_students()
+
+# Reset search & show all students
+def reset_table():
+    search_entry.delete(0, tk.END)
+    display_students()
+
+root = tk.Tk()
+root.title("Student Marks Manager")
+root.geometry("880x520")
+root.config(bg="#f4f6fa")
+root.resizable(False, False)
+
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("Treeview", background="#ffffff", foreground="#000", rowheight=26, fieldbackground="#f9f9f9", font=("Segoe UI", 10))
+style.configure("Treeview.Heading", background="#4A90E2", foreground="white", font=("Segoe UI", 10, "bold"))
+style.map("Treeview", background=[("selected", "#a8c5f0")])
+
+students = load_student_data()  
+
+# Columns for the table
+columns = ("Code", "Name", "Coursework (60)", "Exam (100)", "Overall %", "Grade")
+tree = ttk.Treeview(root, columns=columns, show="headings", height=15)
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=130 if col != "Name" else 180, anchor="center")
+tree.pack(pady=15)
+
+frame = tk.Frame(root, bg="#f4f6fa")
+frame.pack(pady=5)
+
+# Helper to create buttons easily
+def make_btn(text, cmd, color="#4A90E2"):
+    return tk.Button(frame, text=text, command=cmd, bg=color, fg="white", font=("Segoe UI", 10, "bold"),
+                     relief="flat", padx=12, pady=6, activebackground="#357ABD", cursor="hand2", bd=0)
+
+# Search widgets
+tk.Label(frame, text="Search (Name or Code):", font=("Segoe UI", 10, "bold"), bg="#f4f6fa").grid(row=0, column=0, padx=5)
+search_entry = tk.Entry(frame, width=25, font=("Segoe UI", 10), relief="flat", bd=2, highlightthickness=1, highlightbackground="#ccc")
+search_entry.grid(row=0, column=1, padx=5)
+
+make_btn("Search", search_student).grid(row=0, column=2, padx=5)
+make_btn("View All", reset_table, "#6c757d").grid(row=0, column=3, padx=5)
+make_btn("Highest", show_highest, "#2ecc71").grid(row=0, column=4, padx=5)
+make_btn("Lowest", show_lowest, "#e67e22").grid(row=0, column=5, padx=5)
+make_btn("Quit", root.destroy, "#e74c3c").grid(row=0, column=6, padx=5)
+
+# Label to show summary info like average or top student
+summary_text = tk.StringVar()
+summary_label = tk.Label(root, textvariable=summary_text, font=("Segoe UI", 11, "bold"), fg="#4A90E2", bg="#f4f6fa", justify="center")
+summary_label.pack(pady=12)
+
+display_students()  
+root.mainloop()
